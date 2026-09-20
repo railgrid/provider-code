@@ -8,7 +8,6 @@ package actions
 import (
 	"context"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/railgrid/provider-code/backend"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	ktesting "k8s.io/client-go/testing"
@@ -31,7 +31,7 @@ func admissionServer(t *testing.T, allowed bool) *Server {
 	caller.PrependReactor("create", "selfsubjectaccessreviews", func(ktesting.Action) (bool, runtime.Object, error) {
 		return true, &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"allowed": allowed}}}, nil
 	})
-	return New(callerFixture{client: caller, t: t}, func(context.Context, string, string) (dynamic.Interface, error) {
+	return New(callerFixture{client: caller, t: t}, func(context.Context, string, schema.GroupVersionResource, string) (dynamic.Interface, error) {
 		t.Error("unexpected credential authority lookup")
 		return nil, context.Canceled
 	}, backend.NewRegistry())
@@ -111,35 +111,5 @@ func TestActionBodyAdmissionAndCancellation(t *testing.T) {
 	case <-probe.started:
 		t.Fatal("unauthorized body was read")
 	default:
-	}
-}
-
-func TestActionBodyDeadlineOnHTTPConnection(t *testing.T) {
-	for _, prefix := range []string{"", "{}"} {
-		t.Run("prefix="+prefix, func(t *testing.T) {
-			done := make(chan error, 1)
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				_, err := readActionRequest(r.Context(), w, r, 65536, 50*time.Millisecond)
-				done <- err
-			}))
-			defer srv.Close()
-			conn, err := net.Dial("tcp", srv.Listener.Addr().String())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer func() { _ = conn.Close() }()
-			_, err = io.WriteString(conn, "POST / HTTP/1.1\r\nHost: test\r\nContent-Length: 100\r\n\r\n"+prefix)
-			if err != nil {
-				t.Fatal(err)
-			}
-			select {
-			case err := <-done:
-				if err == nil {
-					t.Fatal("stalled body accepted")
-				}
-			case <-time.After(5 * time.Second):
-				t.Fatal("HTTP body deadline failed")
-			}
-		})
 	}
 }

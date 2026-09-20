@@ -1,8 +1,37 @@
+# Copyright 2026 The Railgrid Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# GENERATED FILE — DO NOT EDIT.
+#
+# Written by provider-sdk/cmd/apiexportgen from two inputs:
+#   metadata.name, spec.permissionClaims  <- manifest.yaml spec.apiExport
+#   spec.resources                        <- kcp apigen (hack/apigen.sh)
+# Regenerate with: make codegen-<provider>-provider. spec.permissionClaims
+# carries no identityHash: provider-sdk/install stamps one per installation for
+# first-party (*.railgrid.ai) claim groups.
 apiVersion: apis.kcp.io/v1alpha2
 kind: APIExport
 metadata:
-  name: code.railgrid.ai
+  name: code.providers.railgrid.ai
 spec:
+  permissionClaims:
+  - defaultSelector:
+      matchLabels:
+        railgrid.ai/owner: code
+    resource: secrets
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
   resources:
   - group: code.railgrid.ai
     name: collaborators
@@ -44,4 +73,3 @@ spec:
     schema: v260802-8d0bfc17.repositorycommits.code.railgrid.ai
     storage:
       crd: {}
-status: {}
